@@ -3,6 +3,7 @@ import Alerts from "./components/Alerts";
 import SensorStatus from "./components/SensorStatus";
 import MapView from "./components/MapView";
 import DroneHistory from "./components/DroneHistory";
+import { useEchoShield } from "./hooks/useEchoShield";
 import "./App.css";
 import {
   estimateDronePositionFromDetections,
@@ -125,6 +126,8 @@ function App() {
   const addDetection = useCallback((msg: DetectionMessage) => {
     setDetections((prev) => [...prev, msg].slice(-200));
   }, []);
+
+  useEchoShield({ onMessage: addDetection });
 
   const estimatedDrone = useMemo(() => {
     if (detections.length < 3) return null;

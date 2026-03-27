@@ -21,7 +21,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 JSON_DIR = "jsonDados"
-HOST     = "172.20.10.2"
+HOST     = "0.0.0.0"
 PORT     = 8765
 
 # Conjunto de clientes React ligados
