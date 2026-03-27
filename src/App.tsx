@@ -89,7 +89,7 @@ function App() {
     sensors: [
       { id: "EchoShield_Node_Alpha", status: "online", position: [38.7223, -9.1393] },
       { id: "EchoShield_Node_Beta", status: "online", position: [38.72165, -9.1411] },
-      { id: "EchoShield_Node_Gamma", status: "online", position: [38.72085, -9.13855] },
+      { id: "EchoShield_Node_Gamma", status: "offline", position: [38.72085, -9.13855] },
       { id: "EchoShield_Node_Delta", status: "online", position: [38.72305, -9.14005] },
       { id: "EchoShield_Node_Epsilon", status: "online", position: [38.7211, -9.1422] },
     ],
@@ -166,11 +166,19 @@ function App() {
       latestByDevice.set(det.device_id, det);
     }
 
-    return Array.from(latestByDevice.values()).map((det) => ({
-      id: det.device_id,
-      status: "online",
-      position: [det.latitude, det.longitude],
-    }));
+    return data.sensors.map((sensor) => {
+      const det = latestByDevice.get(sensor.id);
+
+      if (!det) {
+        return sensor;
+      }
+
+      return {
+        id: sensor.id,
+        status: sensor.status,
+        position: [det.latitude, det.longitude] as [number, number],
+      };
+    });
   }, [detections, data.sensors]);
 
   const displayedDronePosition: [number, number] = estimatedDrone
@@ -209,21 +217,23 @@ function App() {
       const refLng = data.myPosition[1];
       const emissionTime = Date.now() / 1000;
 
-      const mockDevices: DetectionMessage[] = data.sensors.map((sensor) => {
-        const dMeters = distanceMeters(sensor.position, trueDrone, refLat, refLng);
-        const travelTime = dMeters / SOUND_SPEED;
-        const noiseSeconds = (Math.random() - 0.5) * 0.00005;
+      const mockDevices: DetectionMessage[] = data.sensors
+        .filter((sensor) => sensor.status === "online")
+        .map((sensor) => {
+          const dMeters = distanceMeters(sensor.position, trueDrone, refLat, refLng);
+          const travelTime = dMeters / SOUND_SPEED;
+          const noiseSeconds = (Math.random() - 0.5) * 0.00005;
 
-        return {
-          device_id: sensor.id,
-          threat_type: "UAV/Drone",
-          confidence: 95 + Math.random() * 4,
-          latitude: sensor.position[0],
-          longitude: sensor.position[1],
-          timestamp: emissionTime + travelTime + noiseSeconds,
-          analysis_id: analysisId,
-        };
-      });
+          return {
+            device_id: sensor.id,
+            threat_type: "UAV/Drone",
+            confidence: 95 + Math.random() * 4,
+            latitude: sensor.position[0],
+            longitude: sensor.position[1],
+            timestamp: emissionTime + travelTime + noiseSeconds,
+            analysis_id: analysisId,
+          };
+        });
 
       mockDevices.forEach(addDetection);
 
