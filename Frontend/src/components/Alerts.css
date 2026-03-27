@@ -1,0 +1,36 @@
+.alert-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 64, 64, 0.1);
+  border: 1px solid rgba(255, 64, 64, 0.45);
+  border-radius: 4px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  animation: blink 1.2s infinite;
+}
+
+.alert-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-red);
+  box-shadow: 0 0 8px var(--c-red);
+  flex-shrink: 0;
+}
+
+.alert-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--c-red);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  flex: 1;
+}
+
+.alert-conf {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-red-dim);
+  letter-spacing: 1px;
+}
