@@ -34,9 +34,24 @@ export type DroneEvent = {
 
 const SOUND_SPEED = 343;
 
-// helpers para mock TDOA
 function toRadians(deg: number) {
   return (deg * Math.PI) / 180;
+}
+
+function metersToLatLngOffset(
+  northMeters: number,
+  eastMeters: number,
+  refLat: number
+): [number, number] {
+  const dLat = northMeters / 111320;
+  const dLng = eastMeters / (111320 * Math.cos(toRadians(refLat)));
+  return [dLat, dLng];
+}
+
+function point300mWestOf(position: [number, number]): [number, number] {
+  const [lat, lng] = position;
+  const [, dLng] = metersToLatLngOffset(0, -300, lat);
+  return [lat, lng + dLng];
 }
 
 function latLngToLocalMeters(
@@ -72,21 +87,21 @@ function App() {
     direction: 120,
     alert: true,
     sensors: [
-      { id: "EchoShield_Node_Alpha", status: "online", position: [38.72230, -9.13930] },
-      { id: "EchoShield_Node_Beta", status: "online", position: [38.72165, -9.14110] },
+      { id: "EchoShield_Node_Alpha", status: "online", position: [38.7223, -9.1393] },
+      { id: "EchoShield_Node_Beta", status: "online", position: [38.72165, -9.1411] },
       { id: "EchoShield_Node_Gamma", status: "online", position: [38.72085, -9.13855] },
       { id: "EchoShield_Node_Delta", status: "online", position: [38.72305, -9.14005] },
-      { id: "EchoShield_Node_Epsilon", status: "online", position: [38.72110, -9.14220] },
+      { id: "EchoShield_Node_Epsilon", status: "online", position: [38.7211, -9.1422] },
     ],
-    dronePosition: [38.72155, -9.14010],
-    myPosition: [38.72200, -9.14180],
+    dronePosition: [38.72155, -9.1401],
+    myPosition: [38.722, -9.1418],
   });
 
   const [history, setHistory] = useState<DroneEvent[]>([
     {
       id: 1,
       timestamp: new Date(Date.now() - 4 * 60000),
-      position: [38.72120, -9.14060],
+      position: [38.7212, -9.1406],
       confidence: 0.91,
     },
     {
@@ -170,48 +185,57 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // mock TDOA coerente
   useEffect(() => {
     const simulation = setInterval(() => {
       const analysisId = Math.floor(Date.now() / 5000);
 
-      // posição "real" do drone para teste
+      const baseDrone = point300mWestOf(data.myPosition);
+
+      const droneJitterNorth = (Math.random() - 0.5) * 20;
+      const droneJitterEast = (Math.random() - 0.5) * 20;
+
+      const [dLat, dLng] = metersToLatLngOffset(
+        droneJitterNorth,
+        droneJitterEast,
+        data.myPosition[0]
+      );
+
       const trueDrone: [number, number] = [
-        38.72155 + (Math.random() - 0.5) * 0.00015,
-        -9.14010 + (Math.random() - 0.5) * 0.00015,
+        baseDrone[0] + dLat,
+        baseDrone[1] + dLng,
       ];
 
       const refLat = data.myPosition[0];
       const refLng = data.myPosition[1];
-      const baseTime = Date.now() / 1000;
+      const emissionTime = Date.now() / 1000;
 
-      const mockDevices: DetectionMessage[] = data.sensors.map((sensor, index) => {
+      const mockDevices: DetectionMessage[] = data.sensors.map((sensor) => {
         const dMeters = distanceMeters(sensor.position, trueDrone, refLat, refLng);
         const travelTime = dMeters / SOUND_SPEED;
-
-        // pequeno ruído para parecer mais realista
-        const noise = (Math.random() - 0.5) * 0.00015;
+        const noiseSeconds = (Math.random() - 0.5) * 0.00005;
 
         return {
           device_id: sensor.id,
           threat_type: "UAV/Drone",
-          confidence: 96 - index + Math.random() * 3,
+          confidence: 95 + Math.random() * 4,
           latitude: sensor.position[0],
           longitude: sensor.position[1],
-          timestamp: baseTime + travelTime + noise,
+          timestamp: emissionTime + travelTime + noiseSeconds,
           analysis_id: analysisId,
         };
       });
 
       mockDevices.forEach(addDetection);
 
+      const newConfidence = 0.94 + Math.random() * 0.05;
+
       setData((prev) => ({
         ...prev,
         alert: true,
         drone: true,
-        confidence: 0.92 + Math.random() * 0.06,
-        direction: (prev.direction + 6) % 360,
-        dronePosition: trueDrone, // só para fallback/debug
+        confidence: newConfidence,
+        direction: (prev.direction + 4) % 360,
+        dronePosition: trueDrone,
       }));
 
       setEventCounter((prevId) => {
@@ -220,7 +244,7 @@ function App() {
             id: prevId,
             timestamp: new Date(),
             position: trueDrone,
-            confidence: 0.92 + Math.random() * 0.06,
+            confidence: newConfidence,
           };
 
           return [entry, ...prevHistory].slice(0, 20);
