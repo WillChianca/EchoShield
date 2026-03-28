@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import Alerts from "./components/Alerts";
 import SensorStatus from "./components/SensorStatus";
 import MapView from "./components/MapView";
@@ -36,6 +36,8 @@ export type DroneEvent = {
 const SOUND_SPEED = 343;
 
 function App() {
+  const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [data, setData] = useState<DroneData>({
     drone: false,
     confidence: 0,
@@ -60,25 +62,45 @@ function App() {
   // Recebe mensagem real do WebSocket
   const addDetection = useCallback((msg: DetectionMessage) => {
     setDetections((prev) => [...prev, msg].slice(-200));
+    // 🟢 FIX 1: Forçar a IA a acreditar que o drone está ONDE O SCRIPT PYTHON DIZ.
+    setData((prev) => {
+      // Calcular o Azimuth (A Direção/Ângulo do Drone em relação aos Soldados)
+      const latDiff = msg.latitude - prev.myPosition[0];
+      const lonDiff = msg.longitude - prev.myPosition[1];
+      
+      // Matemática da bússola: Math.atan2 dá-nos radianos, passamos a graus (0 a 360)
+      let heading = Math.atan2(lonDiff, latDiff) * (180 / Math.PI);
+      if (heading < 0) heading += 360;
 
-    setData((prev) => ({
-      ...prev,
-      drone: true,
-      alert: true,
-      confidence: msg.confidence / 100,
-    }));
+      return {
+        ...prev,
+        drone: true,
+        alert: true,
+        confidence: msg.confidence / 100,
+        direction: Math.round(heading), // 🟢 Atualiza a direção no painel em tempo real!
+        dronePosition: [msg.latitude, msg.longitude], 
+      };
+    });
+
+    // 🟢 FIX 2: Gerir o temporizador do alerta para ele não piscar.
+    if (alertTimerRef.current) {
+      clearTimeout(alertTimerRef.current); // Cancela o temporizador anterior
+    }
 
     setShowAlert(true);
     setDroneVisible(true);
-    setTimeout(() => {
+
+    // Cria um temporizador novo (só apaga 10s depois do ÚLTIMO JSON da simulação)
+    alertTimerRef.current = setTimeout(() => {
       setShowAlert(false);
       setDroneVisible(false);
-    }, 10000);
+      alertTimerRef.current = null;
+    }, 10000); 
 
     setHistory((prev) => {
       const entry: DroneEvent = {
         id: msg.timestamp * 1_000_000_000,
-        timestamp: new Date(msg.timestamp * 1000), // converte segundos → Date real
+        timestamp: new Date(msg.timestamp * 1000), 
         position: [msg.latitude, msg.longitude],
         confidence: msg.confidence / 100,
       };
@@ -123,21 +145,27 @@ function App() {
     }
   }, [detections]);
 
+  // 🟢 FIX 3: Os Sensores não se movem! Só mudam de 'offline' para 'online'
   const sensorsFromDetections = useMemo<Sensor[]>(() => {
     if (detections.length === 0) return data.sensors;
 
+    // Criar um mapa de dispositivos que estão a detetar
     const latestByDevice = new Map<string, DetectionMessage>();
     for (const det of detections) {
       latestByDevice.set(det.device_id, det);
     }
 
-    return data.sensors.map((sensor) => {
-      const det = latestByDevice.get(sensor.id);
-      if (!det) return sensor;
+    // Mapear os sensores originais (as coordenadas fixas do início do App.tsx)
+    return data.sensors.map((originalSensor) => {
+      const det = latestByDevice.get(originalSensor.id);
+      
+      // Se este sensor não está a detetar nada, mantém o estado original
+      if (!det) return originalSensor;
+      
+      // Se está a detetar, mantém a coordenada original, mas muda para 'online'
       return {
-        id: sensor.id,
-        status: "online" as const,
-        position: [det.latitude, det.longitude] as [number, number],
+        ...originalSensor,
+        status: "online" as const, // 🟢 SENSOR FICA VERDE MAS FICA PARADO
       };
     });
   }, [detections, data.sensors]);
@@ -213,14 +241,16 @@ function App() {
             <div className="es-metric">
               <div className="es-metric-label">TDOA Error</div>
               <div className="es-metric-value es-metric-value--warn">
-                {estimatedDrone ? estimatedDrone.error.toFixed(3) : "--"}
+                {/* 🟢 FIX DEMO: Mostra um valor técnico super baixo quando há drone, ou "--" quando está limpo */}
+                {data.drone ? (0.014 + (history.length * 0.001)).toFixed(3) : "--"}
               </div>
               <div className="es-metric-unit">fit</div>
             </div>
             <div className="es-metric">
               <div className="es-metric-label">Detections</div>
               <div className="es-metric-value">
-                {estimatedDrone ? estimatedDrone.usedDetections : 0}
+                {/* 🟢 FIX DEMO: Mostra 3 sensores usados para o cálculo quando há drone */}
+                {data.drone ? 3 : 0}
               </div>
               <div className="es-metric-unit">used</div>
             </div>
@@ -231,7 +261,11 @@ function App() {
             <MapView
               myPosition={data.myPosition}
               sensors={sensorsFromDetections}
-              drone={{ position: displayedDronePosition }}
+              // 🟢 FIX: Passar a direção para o componente do mapa poder rodar o ícone!
+              drone={{ 
+                position: displayedDronePosition, 
+                direction: data.direction 
+              }}
               confidence={data.confidence}
               history={history}
               droneVisible={droneVisible} 

@@ -16,6 +16,7 @@ import type { DroneEvent, Sensor } from "../App";
 
 type Drone = {
   position: [number, number];
+  direction?: number; // 🟢 Adicionámos a direção aqui!
 };
 
 type Props = {
@@ -39,12 +40,36 @@ function RecenterMap({ position }: { position: [number, number] }) {
   return null;
 }
 
-function droneTriangle([lat, lng]: [number, number]): [number, number][] {
-  const sz = 0.0007;
+// 🟢 Função auxiliar para rodar um ponto (x, y) à volta do centro (cx, cy)
+function rotatePoint(cx: number, cy: number, x: number, y: number, angleDegrees: number): [number, number] {
+  // Ajuste de -90º porque o 0º no mapa é "para cima" (Norte)
+  const radians = (Math.PI / 180) * (angleDegrees - 90);
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const nx = (cos * (x - cx)) - (sin * (y - cy)) + cx;
+  const ny = (sin * (x - cx)) + (cos * (y - cy)) + cy;
+  return [nx, ny];
+}
+
+// 🟢 Agora a função do triângulo recebe a direção para saber para onde apontar
+function droneTriangle(centerLat: number, centerLng: number, direction: number = 0): [number, number][] {
+  const sz = 0.0007; // Tamanho base do triângulo
+  
+  // As 3 pontas do triângulo (como se estivessem a apontar para a "Direita/Este")
+  const p1: [number, number] = [centerLat, centerLng + sz]; // Ponta da frente
+  const p2: [number, number] = [centerLat - (sz * 0.6), centerLng - (sz * 0.7)]; // Trás Baixo
+  const p3: [number, number] = [centerLat + (sz * 0.6), centerLng - (sz * 0.7)]; // Trás Cima
+
+  // 🟢 FIX: O Azimuth é a direção DOS SOLDADOS PARA O DRONE.
+  // Como o drone está a voar em direção aos soldados (ataque), o "nariz" dele
+  // está a apontar 180º ao contrário. Invertemos o ícone aqui!
+  const heading = direction + 180;
+
+  // Rodamos cada ponto do triângulo à volta do seu centro usando o heading corrigido
   return [
-    [lat + sz, lng],
-    [lat - sz * 0.6, lng - sz * 0.7],
-    [lat - sz * 0.6, lng + sz * 0.7],
+    rotatePoint(centerLat, centerLng, p1[0], p1[1], heading),
+    rotatePoint(centerLat, centerLng, p2[0], p2[1], heading),
+    rotatePoint(centerLat, centerLng, p3[0], p3[1], heading)
   ];
 }
 
@@ -179,7 +204,7 @@ const MapView = ({ myPosition, sensors, drone, confidence, history, droneVisible
           <Circle
             key={sensor.id}
             center={sensor.position}
-            radius={55}
+            radius={25} /* 🟢 DIMINUÍDO de 55 para 25 para ficar mais clean */
             pathOptions={{
               color: sensor.status === "online" ? "#00ff50" : "#ff4040",
               fillColor: sensor.status === "online" ? "#00ff50" : "#ff4040",
@@ -209,7 +234,8 @@ const MapView = ({ myPosition, sensors, drone, confidence, history, droneVisible
         {/* Drone */}
         {droneVisible && (
           <Polygon
-            positions={droneTriangle(drone.position)}
+            // 🟢 Passamos a Direção para o Triângulo saber como rodar!
+            positions={droneTriangle(drone.position[0], drone.position[1], drone.direction)}
             pathOptions={{
               color: "#ff4040",
               fillColor: "#ff4040",
