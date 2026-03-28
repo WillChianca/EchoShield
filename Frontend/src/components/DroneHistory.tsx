@@ -34,7 +34,7 @@ const DroneHistory = ({ events }: Props) => {
       {events.map((evt, i) => (
         <div key={evt.id} className={`dh-row ${i === 0 ? "dh-row--latest" : ""}`}>
           <div className="dh-row-top">
-            <span className="dh-index">#{String(evt.id).padStart(3, "0")}</span>
+            <span className="dh-index">#{String(events.length - i).padStart(3, "0")}</span>
             <span className="dh-time">{formatTime(evt.timestamp)}</span>
             <span className="dh-ago">{timeAgo(evt.timestamp)}</span>
           </div>

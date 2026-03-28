@@ -37,9 +37,9 @@ except ImportError:
 SAMPLE_RATE = 16000  # Hz obrigatório para YAMNet
 
 # ── Configurações táticas ─────────────────────────────────────
-DEVICE_ID  = "EchoShield_Node_Alpha"
-DEVICE_LAT = 38.7223   # Lisboa (alterar para coordenadas reais do nó)
-DEVICE_LON = -9.1393
+DEVICE_ID  = "EchoShield_Node_Gamma"
+DEVICE_LAT = 38.72085   # Lisboa (alterar para coordenadas reais do nó)
+DEVICE_LON = -9.13855
 JSON_DIR   = "jsonDados"
 
 
@@ -49,20 +49,22 @@ def criar_pasta_json():
     print(f"📁  Alertas JSON → ./{JSON_DIR}/")
 
 
-# ── Guardar alerta em JSON ────────────────────────────────────
+# ── Guardar alerta em JSON ─────────────────────────────
 def guardar_alerta_json(prob: float, n: int):
+    # analysis_id = janela de 5 segundos — sincroniza entre sensores
+    analysis_id = int(time.time()) // 5
+
     payload = {
-        "device_id":  DEVICE_ID,
+        "device_id":   DEVICE_ID,
         "threat_type": "UAV/Drone",
         "confidence":  round(prob * 100, 2),
         "latitude":    DEVICE_LAT,
         "longitude":   DEVICE_LON,
         "timestamp":   int(time.time_ns()),
-        "analysis_id": n,
+        "analysis_id": analysis_id,
     }
 
-    # Nome do ficheiro: alerta_<timestamp>_<id>.json
-    nome = f"alerta_{payload['timestamp']}_{n:04d}.json"
+    nome = f"alerta_{payload['timestamp']}_{DEVICE_ID}.json"
     caminho = os.path.join(JSON_DIR, nome)
 
     with open(caminho, "w", encoding="utf-8") as f:

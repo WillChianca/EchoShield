@@ -14,6 +14,7 @@ export function useEchoShield({ onMessage }: Options) {
   useEffect(() => {
     let ws: WebSocket;
     let alive = true;
+    const seenIds = new Set<string>(); // evita duplicados
 
     function connect() {
       ws = new WebSocket(WS_URL);
@@ -22,9 +23,12 @@ export function useEchoShield({ onMessage }: Options) {
 
       ws.onmessage = (event) => {
         try {
-          const raw = JSON.parse(event.data);
+            const raw = JSON.parse(event.data);
+            const key = `${raw.device_id}_${raw.analysis_id}_${raw.timestamp}`;
+            console.log("🔑 KEY:", key, "| JÁ VISTO:", seenIds.has(key));
+          if (seenIds.has(key)) return; // ignora duplicado
+          seenIds.add(key);
 
-          // timestamp vem em nanosegundos → converter para segundos
           const msg: DetectionMessage = {
             ...raw,
             timestamp: raw.timestamp / 1_000_000_000,
@@ -39,7 +43,7 @@ export function useEchoShield({ onMessage }: Options) {
       ws.onclose = () => {
         if (alive) {
           console.log("🔄 WebSocket desligado, a reconectar em 2s...");
-          setTimeout(connect, 2000); // reconecta automaticamente
+          setTimeout(connect, 2000);
         }
       };
 

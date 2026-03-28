@@ -73,7 +73,7 @@ async def handler(websocket):
     print(f"🔌  React ligado: {addr}  ({len(connected_clients)} cliente(s))")
 
     # Ao ligar, envia os últimos 10 alertas já existentes (histórico)
-    historico = carregar_historico(10)
+    historico = carregar_historico(5)
     for alerta in historico:
         await websocket.send(json.dumps(alerta))
 

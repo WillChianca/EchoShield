@@ -1,0 +1,9 @@
+{
+  "device_id": "EchoShield_Node_Gamma",
+  "threat_type": "UAV/Drone",
+  "confidence": 68.7,
+  "latitude": 38.72085,
+  "longitude": -9.13855,
+  "timestamp": 1774656061080793000,
+  "analysis_id": 354931212
+}

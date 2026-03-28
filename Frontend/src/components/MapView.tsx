@@ -24,6 +24,7 @@ type Props = {
   drone: Drone;
   confidence: number;
   history: DroneEvent[];
+  droneVisible: boolean;
 };
 
 function RecenterMap({ position }: { position: [number, number] }) {
@@ -38,7 +39,6 @@ function RecenterMap({ position }: { position: [number, number] }) {
   return null;
 }
 
-// Triângulo do drone
 function droneTriangle([lat, lng]: [number, number]): [number, number][] {
   const sz = 0.0007;
   return [
@@ -48,15 +48,12 @@ function droneTriangle([lat, lng]: [number, number]): [number, number][] {
   ];
 }
 
-// Distância simples entre 2 pontos
 function distanceBetween(a: [number, number], b: [number, number]) {
   const dx = a[0] - b[0];
   const dy = a[1] - b[1];
   return Math.hypot(dx, dy);
 }
 
-// Constrói caminho por proximidade:
-// eu -> sensor mais próximo -> próximo dele -> etc.
 function buildNearestNeighborPath(
   myPosition: [number, number],
   sensors: Sensor[]
@@ -88,7 +85,6 @@ function buildNearestNeighborPath(
   return path;
 }
 
-// Ícone da tua posição
 const myIcon = L.divIcon({
   className: "my-location-icon",
   html: `<div class="my-location-dot"></div>`,
@@ -96,14 +92,13 @@ const myIcon = L.divIcon({
   iconAnchor: [9, 9],
 });
 
-// Zonas de perigo em torno da tua posição
 const DANGER_ZONES = [
   { radius: 150, color: "#ff4040", opacity: 0.16, label: "HOT ZONE" },
-  { radius: 350, color: "#ff8800", opacity: 0.1, label: "CAUTION" },
-  { radius: 600, color: "#ffbe00", opacity: 0.06, label: "MONITOR" },
+  { radius: 350, color: "#ff8800", opacity: 0.1,  label: "CAUTION"  },
+  { radius: 600, color: "#ffbe00", opacity: 0.06, label: "MONITOR"  },
 ];
 
-const MapView = ({ myPosition, sensors, drone, confidence, history }: Props) => {
+const MapView = ({ myPosition, sensors, drone, confidence, history, droneVisible }: Props) => {
   const trail: [number, number][] = [
     ...history.slice(0, 8).map((e) => e.position).reverse(),
     drone.position,
@@ -134,7 +129,7 @@ const MapView = ({ myPosition, sensors, drone, confidence, history }: Props) => 
 
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
 
-        {/* Polígono fechado entre devices por proximidade */}
+        {/* Mesh entre sensores */}
         {formationPoints.length >= 3 && (
           <Polygon
             positions={formationPoints}
@@ -179,7 +174,7 @@ const MapView = ({ myPosition, sensors, drone, confidence, history }: Props) => 
           </Circle>
         ))}
 
-        {/* Sensores / parceiros */}
+        {/* Sensores */}
         {sensors.map((sensor) => (
           <Circle
             key={sensor.id}
@@ -199,7 +194,7 @@ const MapView = ({ myPosition, sensors, drone, confidence, history }: Props) => 
         ))}
 
         {/* Trail do drone */}
-        {trail.length > 1 && (
+        {droneVisible && trail.length > 1 && (
           <Polyline
             positions={trail}
             pathOptions={{
@@ -212,22 +207,24 @@ const MapView = ({ myPosition, sensors, drone, confidence, history }: Props) => 
         )}
 
         {/* Drone */}
-        <Polygon
-          positions={droneTriangle(drone.position)}
-          pathOptions={{
-            color: "#ff4040",
-            fillColor: "#ff4040",
-            fillOpacity: 0.75,
-            weight: 1.5,
-          }}
-        >
-          <Tooltip sticky className="map-tooltip map-tooltip--danger">
-            BOGEY-1 · CONF {Math.round(confidence * 100)}%
-          </Tooltip>
-        </Polygon>
+        {droneVisible && (
+          <Polygon
+            positions={droneTriangle(drone.position)}
+            pathOptions={{
+              color: "#ff4040",
+              fillColor: "#ff4040",
+              fillOpacity: 0.75,
+              weight: 1.5,
+            }}
+          >
+            <Tooltip sticky className="map-tooltip map-tooltip--danger">
+              BOGEY-1 · CONF {Math.round(confidence * 100)}%
+            </Tooltip>
+          </Polygon>
+        )}
 
         {/* Ghost positions históricos */}
-        {history.slice(0, 6).map((evt, i) => (
+        {droneVisible && history.slice(0, 6).map((evt, i) => (
           <Circle
             key={evt.id}
             center={evt.position}
